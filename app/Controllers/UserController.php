@@ -3,15 +3,22 @@
 namespace App\Controllers;
 
 use App\Controllers\BaseController;
+use App\Libraries\JWTService;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use ReflectionException;
-use function PHPUnit\Framework\isNull;
 
 class UserController extends BaseController
 {
     protected string $format = 'json';
     protected string $modelName = 'App\Models\UserModel';
+    private JWTService $JWTService;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->JWTService = new JWTService();
+    }
 
     public function findUser(): ResponseInterface
     {
@@ -33,10 +40,12 @@ class UserController extends BaseController
             'email' => $data['email']
         ]);
     }
+
     public function login(): ResponseInterface
     {
         $rules = [
-            'email' => 'required|valid_email'
+            'email' => 'required|valid_email',
+            'master_password_hash' => 'required'
         ];
         $input = $this->getRequestInput($this->request);
         if (!$this->validateRequest($input, $rules)) {
@@ -45,15 +54,26 @@ class UserController extends BaseController
         }
 
         $userModel = new UserModel();
+
         $user = $userModel->getUserByEmail($input['email']);
         if (is_null($user)){
             return $this->fails(['error' => 'User Not Found'], ResponseInterface::HTTP_NOT_FOUND);
         }
 
-        return $this->success([
-            'user_id' => $user['user_id'],
-            'master_password_hash' => $user['master_password_hash']
-        ]);
+        if ($user && $input['master_password_hash'] === $user['master_password_hash']) {
+            $expirationSec = 3600; // TODO: based on the setting of the user
+            $JWTData = [
+                'user_id' => $user['user_id'],
+                'email' => $user['email'],
+            ];
+            $token = $this->JWTService->encode($JWTData, $expirationSec);
+            return $this->success([
+                'JWTToken' => $token,
+                'user_id' => $user['user_id'],
+            ]);
+        } else {
+            return $this->fails(['error' => 'Invalid Password'], ResponseInterface::HTTP_UNAUTHORIZED);
+        }
     }
 
     public function register(): ResponseInterface

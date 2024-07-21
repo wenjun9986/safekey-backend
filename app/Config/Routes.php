@@ -8,7 +8,7 @@ use CodeIgniter\Router\RouteCollection;
 $routes->group('', function ($routes) {
     $routes->group('user', ['namespace' => 'App\Controllers'], function ($routes) {
         $routes->get('find', 'UserController::findUser');
-        $routes->get('login', 'UserController::login');
+        $routes->post('login', 'UserController::login');
         $routes->post('register', 'UserController::register');
     });
     $routes->group('vault', ['namespace' => 'App\Controllers'], function ($routes) {
