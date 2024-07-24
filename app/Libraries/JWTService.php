@@ -8,8 +8,7 @@ class JWTService {
     private $alg;
 
     public function __construct() {
-        //TODO: Switch to ENV KEY
-        $this->key = 'fUt5w4vDoAvCjsKDw5HDtFHCnsKBwrDCqcKqwptKwpk+wrNhe01nw50iw4c=';
+        $this->key = env('JWT_SECRET_KEY');
         $this->alg = 'HS256';
     }
 

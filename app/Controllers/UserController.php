@@ -61,7 +61,7 @@ class UserController extends BaseController
         }
 
         if ($user && $input['master_password_hash'] === $user['master_password_hash']) {
-            $expirationSec = 3600; // TODO: based on the setting of the user
+            $expirationSec = 3060; // TODO: based on the setting of the user
             $JWTData = [
                 'user_id' => $user['user_id'],
                 'email' => $user['email'],
