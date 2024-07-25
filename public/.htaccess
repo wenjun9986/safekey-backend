@@ -44,6 +44,20 @@ Options -Indexes
 	ErrorDocument 404 index.php
 </IfModule>
 
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "chrome-extension://pdfmigfjclhalngabdjldmdkhimjboal"
+    Header set Access-Control-Allow-Methods "POST, GET, OPTIONS, PUT, DELETE"
+    Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    Header set Access-Control-Allow-Credentials "true"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Handle OPTIONS requests directly from Apache for all routes
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=204,L]
+</IfModule>
+
 # Disable server signature start
 ServerSignature Off
 # Disable server signature end

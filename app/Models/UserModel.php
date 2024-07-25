@@ -66,9 +66,6 @@ class UserModel extends Model
     {
         $existingConfig = $this->getUserConfig($userId) ?? [];
         $newConfig = array_merge($existingConfig, $config);
-        if (empty($newConfig)) {
-            return $this->update($userId, ['user_config' => null]);
-        }
         return $this->update($userId, ['user_config' => json_encode($newConfig)]);
     }
 
@@ -80,7 +77,11 @@ class UserModel extends Model
         $config = $this->getUserConfig($userId);
         if (array_key_exists($keyToRemove, $config)) {
             unset($config[$keyToRemove]);
-            return $this->updateUserConfig($userId, $config);
+            if(empty($config)){
+                return $this->update($userId, ['user_config' => null]);
+            } else {
+                return $this->update($userId, ['user_config' => json_encode($config)]);
+            }
         }
         return false;
     }

@@ -61,7 +61,15 @@ class UserController extends BaseController
         }
 
         if ($user && $input['master_password_hash'] === $user['master_password_hash']) {
-            $expirationSec = 3060; // TODO: based on the setting of the user
+            $config = $userModel->getUserConfig($user['user_id']);
+
+            if (isset($config['2fa_secret'])) {
+                return $this->success([
+                    "message" => "2FA Enabled",
+                    "user_id" => $user['user_id']
+                ]);
+            }
+            $expirationSec = $config['expiration'] ?? 900;
             $JWTData = [
                 'user_id' => $user['user_id'],
                 'email' => $user['email'],
@@ -100,4 +108,57 @@ class UserController extends BaseController
             }
         }
     }
+
+    public function getUserConfigs(): ResponseInterface
+    {
+        $rules = [
+            'user_id' => 'required'
+        ];
+
+        $input = $this->getRequestInput($this->request);
+        if (!$this->validateRequest($input, $rules)) {
+            $result['data'] = $this->validator->getErrors();
+            return $this->fails($result, ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $userModel = new UserModel();
+        $user = $userModel->getUserByID($input['user_id']);
+        if ($user) {
+            $config = $userModel->getUserConfig($input['user_id']);
+            return $this->success([
+                '2FA' => isset($config['2fa_secret']) ? 'Enabled' : 'Disabled',
+                'expiration' => $config['expiration'] ?? '900',
+            ]);
+        } else {
+            return $this->fails(['error' => 'User Not Found'], ResponseInterface::HTTP_NOT_FOUND);
+        }
+    }
+
+    /**
+     * @throws ReflectionException
+     */
+    public function updateVaultTimeout(): ResponseInterface
+    {
+        $rules = [
+            'user_id' => 'required',
+            'expiration' => 'required'
+        ];
+
+        $input = $this->getRequestInput($this->request);
+        if (!$this->validateRequest($input, $rules)) {
+            $result['data'] = $this->validator->getErrors();
+            return $this->fails($result, ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $userModel = new UserModel();
+        $user = $userModel->getUserByID($input['user_id']);
+        if ($user) {
+            $userModel->updateUserConfig($input['user_id'], ['expiration' => $input['expiration']]);
+            return $this->success(['message' => 'Expiration Updated'], ResponseInterface::HTTP_OK);
+        } else {
+            return $this->fails(['error' => 'User Not Found'], ResponseInterface::HTTP_NOT_FOUND);
+        }
+    }
+
+
 }

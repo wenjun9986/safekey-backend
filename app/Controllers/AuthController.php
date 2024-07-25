@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Controllers\BaseController;
+use App\Libraries\JWTService;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Publisher;
@@ -17,6 +18,13 @@ use PragmaRX\Google2FA\Google2FA;
 class AuthController extends BaseController
 {
     protected string $format = 'json';
+    private JWTService $JWTService;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->JWTService = new JWTService();
+    }
 
     public function validateToken(): ResponseInterface
     {
@@ -76,6 +84,40 @@ class AuthController extends BaseController
         }
     }
 
+    public function get2FADetails(): ResponseInterface
+    {
+        $rules = [
+            'user_id' => 'required'
+        ];
+
+        $input = $this->getRequestInput($this->request);
+        if (!$this->validateRequest($input, $rules)) {
+            $result['data'] = $this->validator->getErrors();
+            return $this->fails($result, ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $userModel = new UserModel();
+        $google2fa = new Google2FA();
+
+        $user = $userModel->getUserByID($input['user_id']);
+        if ($user) {
+            $config = $userModel->getUserConfig($input['user_id']);
+            $secret = $config['2fa_secret'] ?? '';
+            $qrCodeUrl = $google2fa->getQRCodeUrl(
+                'SafeKey',
+                $user['email'],
+                $secret
+            );
+            return $this->success([
+                'secret' => $secret,
+                'qr_code_url' => $qrCodeUrl
+            ]);
+        } else {
+            return $this->fails(['error' => 'User Not Found'], ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+    }
+
     /**
      * @return ResponseInterface
      * @throws IncompatibleWithGoogleAuthenticatorException
@@ -115,16 +157,12 @@ class AuthController extends BaseController
 
     /**
      * @return ResponseInterface
-     * @throws IncompatibleWithGoogleAuthenticatorException
-     * @throws InvalidCharactersException
      * @throws ReflectionException
-     * @throws SecretKeyTooShortException
      */
     public function disable2FA(): ResponseInterface
     {
         $rules = [
-            'user_id' => 'required',
-            'token' => 'required',
+            'user_id' => 'required'
         ];
 
         $input = $this->getRequestInput($this->request);
@@ -133,19 +171,13 @@ class AuthController extends BaseController
             return $this->fails($result, ResponseInterface::HTTP_BAD_REQUEST);
         }
 
-        $google2fa = new Google2FA();
-
-        if ($google2fa->verifyKey($input['secret'], $input['token'])) {
-            $userModel = new UserModel();
-            $user = $userModel->getUserByID($input['user_id']);
-            if ($user) {
-                $userModel->removeConfigKey($input['user_id'], '2fa_secret');
-                return $this->success(['message' => '2FA Disabled'], ResponseInterface::HTTP_OK);
-            } else {
-                return $this->fails(['error' => 'User Not Found'], ResponseInterface::HTTP_NOT_FOUND);
-            }
+        $userModel = new UserModel();
+        $user = $userModel->getUserByID($input['user_id']);
+        if ($user) {
+            $userModel->removeConfigKey($input['user_id'], '2fa_secret');
+            return $this->success(['message' => '2FA Disabled'], ResponseInterface::HTTP_OK);
         } else {
-            return $this->fails(['error' => 'Invalid Token'], ResponseInterface::HTTP_UNAUTHORIZED);
+            return $this->fails(['error' => 'User Not Found'], ResponseInterface::HTTP_NOT_FOUND);
         }
     }
 
@@ -158,7 +190,7 @@ class AuthController extends BaseController
     {
         $rules = [
             'user_id' => 'required',
-            'token' => 'required',
+            'otp' => 'required',
         ];
 
         $input = $this->getRequestInput($this->request);
@@ -174,10 +206,19 @@ class AuthController extends BaseController
         if ($user) {
             $config = $userModel->getUserConfig($input['user_id']);
             $secret = $config['2fa_secret'] ?? '';
-            if ($google2fa->verifyKey($secret, $input['token'])) {
-                return $this->success(['message' => 'Token is valid'], ResponseInterface::HTTP_OK);
+            if ($google2fa->verifyKey($secret, $input['otp'])) {
+                $expirationSec = $config['expiration'] ?? 900;
+                $JWTData = [
+                    'user_id' => $user['user_id'],
+                    'email' => $user['email'],
+                ];
+                $token = $this->JWTService->encode($JWTData, $expirationSec);
+                return $this->success([
+                    'JWTToken' => $token,
+                    'user_id' => $user['user_id'],
+                ]);
             } else {
-                return $this->fails(['error' => 'Invalid Token'], ResponseInterface::HTTP_UNAUTHORIZED);
+                return $this->fails(['error' => 'Invalid OTP'], ResponseInterface::HTTP_UNAUTHORIZED);
             }
         } else {
             return $this->fails(['error' => 'User Not Found'], ResponseInterface::HTTP_NOT_FOUND);
