@@ -90,4 +90,34 @@ class VaultItemController extends BaseController
             return $this->fails(['error' => 'Vault Item Not Found'], ResponseInterface::HTTP_NOT_FOUND);
         }
     }
+
+    public function deleteVaultItem(): ResponseInterface
+    {
+        $rules = [
+            'item_id' => 'required',
+            'user_id' => 'required',
+        ];
+
+        $input = $this->getRequestInput($this->request);
+        if (!$this->validateRequest($input, $rules)) {
+            $result['data'] = $this->validator->getErrors();
+            return $this->fails($result, ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $input['item_id'] = (int)$input['item_id'];
+
+        $vaultItemModel = new VaultItemModel();
+
+        $data = $vaultItemModel->getVaultItem($input['item_id']);
+        if (!is_null($data)) {
+            if ($data['user_id'] !== $input['user_id']) {
+                return $this->fails(['error' => 'Unauthorized'], ResponseInterface::HTTP_UNAUTHORIZED);
+            } else {
+                $result = $vaultItemModel->delete($input['item_id']);
+                return $this->success(['result' => $result]);
+            }
+        } else {
+            return $this->fails(['error' => 'Vault Item Not Found'], ResponseInterface::HTTP_NOT_FOUND);
+        }
+    }
 }

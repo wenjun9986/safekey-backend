@@ -25,5 +25,6 @@ $routes->group('', function ($routes) {
         $routes->get('list', 'VaultItemController::getVaultList');
         $routes->post('createItem', 'VaultItemController::createVaultItem');
         $routes->post('updateItem', 'VaultItemController::updateVaultItem');
+        $routes->post('deleteItem', 'VaultItemController::deleteVaultItem');
     });
 });

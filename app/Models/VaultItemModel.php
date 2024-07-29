@@ -68,6 +68,11 @@ class VaultItemModel extends Model
         return $this->set(['encrypted_data' => $data])->where('item_id', $item_id)->update();
     }
 
+    public function deleteVaultItem(int $item_id): bool
+    {
+        return $this->where('item_id', $item_id)->delete();
+    }
+
     protected function afterInsert(array $data): void
     {
         $this->insertedData = array_merge([$this->primaryKey => $data['id']], $data['data']);
